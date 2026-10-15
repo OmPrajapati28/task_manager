@@ -48,20 +48,28 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Future<void> _confirmDelete(Task task) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Delete task?'),
+          content: Text('"${task.title}" will be permanently deleted.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: scheme.error,
+                foregroundColor: scheme.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
 
@@ -75,25 +83,35 @@ class _TaskListScreenState extends State<TaskListScreen> {
   Widget build(BuildContext context) {
     final tasks = context.watch<TaskProvider>();
     final theme = context.watch<ThemeProvider>();
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1A1D24) : Colors.white;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Task Manager'),
+        toolbarHeight: 72,
+        title: const Text('My Tasks'),
         actions: [
-          IconButton(
+          IconButton.filledTonal(
             tooltip: tasks.sortAscending
                 ? 'Due date: earliest first'
                 : 'Due date: latest first',
             icon: Icon(
-              tasks.sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              tasks.sortAscending
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
             ),
             onPressed: tasks.toggleSortDirection,
           ),
-          IconButton(
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
             tooltip: 'Toggle dark mode',
-            icon: Icon(theme.isDark ? Icons.light_mode : Icons.dark_mode),
+            icon: Icon(
+              theme.isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
             onPressed: theme.toggle,
           ),
+          const SizedBox(width: 16),
         ],
       ),
       body: Column(
@@ -104,41 +122,58 @@ class _TaskListScreenState extends State<TaskListScreen> {
             completed: tasks.completedCount,
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: TextField(
               controller: _searchController,
               onChanged: tasks.setSearchQuery,
               decoration: InputDecoration(
                 hintText: 'Search by title',
-                isDense: true,
-                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: cardColor,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchController.text.isEmpty
                     ? null
                     : IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          tasks.setSearchQuery('');
-                        },
-                      ),
+                  tooltip: 'Clear search',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _searchController.clear();
+                    tasks.setSearchQuery('');
+                  },
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: scheme.outlineVariant),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: scheme.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: scheme.primary, width: 1.6),
                 ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
               children: [
                 for (final f in TaskFilter.values)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(f.label),
+                    child: _FilterPill(
+                      label: f.label,
+                      count: switch (f) {
+                        TaskFilter.all => tasks.totalCount,
+                        TaskFilter.pending => tasks.pendingCount,
+                        TaskFilter.completed => tasks.completedCount,
+                      },
                       selected: tasks.filter == f,
-                      onSelected: (_) => tasks.setFilter(f),
+                      onTap: () => tasks.setFilter(f),
                     ),
                   ),
               ],
@@ -149,8 +184,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openForm(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add task'),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New task'),
       ),
     );
   }
@@ -164,19 +199,21 @@ class _TaskListScreenState extends State<TaskListScreen> {
     if (items.isEmpty) {
       return tasks.hasTasks
           ? const EmptyState(
-              icon: Icons.search_off,
-              title: 'No matching tasks',
-              message: 'Try a different search or filter.',
-            )
-          : const EmptyState(
-              icon: Icons.task_alt,
-              title: 'No tasks yet',
-              message: 'Tap "Add task" to create your first task.',
-            );
+        icon: Icons.search_off_rounded,
+        title: 'No matching tasks',
+        message: 'Try a different search or filter.',
+      )
+          : EmptyState(
+        icon: Icons.task_alt_rounded,
+        title: 'No tasks yet',
+        message: 'Create your first task and stay on top of your day.',
+        actionLabel: 'Add task',
+        onAction: () => _openForm(),
+      );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 88),
+      padding: const EdgeInsets.only(top: 4, bottom: 96),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final task = items[i];
@@ -188,6 +225,52 @@ class _TaskListScreenState extends State<TaskListScreen> {
           onDelete: () => _confirmDelete(task),
         );
       },
+    );
+  }
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? scheme.primary
+              : (isDark ? const Color(0xFF1A1D24) : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? scheme.primary : scheme.outlineVariant,
+          ),
+        ),
+        child: Text(
+          '$label · $count',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 }

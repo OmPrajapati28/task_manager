@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/task.dart';
 import '../providers/task_provider.dart';
+import '../widgets/task_card.dart';
 
 /// Used for both adding (task == null) and editing (task != null).
 class TaskFormScreen extends StatefulWidget {
@@ -39,6 +40,39 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  InputDecoration _decoration(
+      String label, {
+        String? hint,
+        IconData? icon,
+        String? errorText,
+        bool alignLabelWithHint = false,
+      }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: color, width: width),
+        );
+
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      errorText: errorText,
+      alignLabelWithHint: alignLabelWithHint,
+      prefixIcon: icon == null ? null : Icon(icon),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1A1D24) : Colors.white,
+      border: border(scheme.outlineVariant),
+      enabledBorder: border(scheme.outlineVariant),
+      focusedBorder: border(scheme.primary, 1.6),
+      errorBorder: border(scheme.error),
+      focusedErrorBorder: border(scheme.error, 1.6),
+    );
   }
 
   Future<void> _pickDate(FormFieldState<DateTime> field) async {
@@ -86,10 +120,15 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? 'Edit task' : 'Add task')),
+      appBar: AppBar(
+        toolbarHeight: 72,
+        title: Text(_isEditing ? 'Edit task' : 'New task'),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         child: Form(
           key: _formKey,
           child: Column(
@@ -101,74 +140,152 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 maxLength: 100,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: TaskValidators.title,
-                decoration: const InputDecoration(
-                  labelText: 'Title *',
-                  border: OutlineInputBorder(),
+                decoration: _decoration(
+                  'Title *',
+                  hint: 'What needs to be done?',
+                  icon: Icons.title_rounded,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _descriptionController,
                 maxLines: 4,
                 maxLength: 500,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: TaskValidators.description,
-                decoration: const InputDecoration(
-                  labelText: 'Description *',
+                decoration: _decoration(
+                  'Description *',
+                  hint: 'Add some details',
                   alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               FormField<DateTime>(
                 initialValue: _dueDate,
                 validator: (v) =>
                     TaskValidators.dueDate(v, allowPast: _isEditing),
                 builder: (field) => InkWell(
+                  borderRadius: BorderRadius.circular(16),
                   onTap: () => _pickDate(field),
                   child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Due date *',
-                      border: const OutlineInputBorder(),
+                    decoration: _decoration(
+                      'Due date *',
+                      icon: Icons.event_rounded,
                       errorText: field.errorText,
-                      suffixIcon: const Icon(Icons.calendar_today),
                     ),
-                    child: Text(_dueDate?.displayDate ?? 'Select a date'),
+                    child: Text(
+                      _dueDate?.displayDate ?? 'Select a date',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: _dueDate == null
+                            ? theme.colorScheme.onSurfaceVariant
+                            : null,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text('Priority', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<TaskPriority>(
-                  segments: [
-                    for (final p in TaskPriority.values)
-                      ButtonSegment(value: p, label: Text(p.label)),
-                  ],
-                  selected: {_priority},
-                  onSelectionChanged: (s) =>
-                      setState(() => _priority = s.first),
-                ),
+              const SizedBox(height: 24),
+              Text(
+                'Priority',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  for (final p in TaskPriority.values)
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: p == TaskPriority.high ? 0 : 10,
+                        ),
+                        child: _PriorityChoice(
+                          priority: p,
+                          selected: _priority == p,
+                          onTap: () => setState(() => _priority = p),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
+                height: 54,
                 child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   onPressed: _saving ? null : _save,
                   icon: _saving
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : const Icon(Icons.check_rounded),
                   label: Text(_isEditing ? 'Save changes' : 'Add task'),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PriorityChoice extends StatelessWidget {
+  const _PriorityChoice({
+    required this.priority,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TaskPriority priority;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = TaskCard.priorityColor(priority);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.14)
+              : (isDark ? const Color(0xFF1A1D24) : Colors.white),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? color : theme.colorScheme.outlineVariant,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.flag_rounded,
+              size: 20,
+              color: selected ? color : theme.colorScheme.outline,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              priority.label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? color : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );
